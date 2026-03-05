@@ -9,39 +9,13 @@ description: 使用 curl + x-api-key 操作 Plane 專案管理系統。當使用
 
 ## 連線資訊
 
-**使用前先讀取** `~/.cursor/skills/plane-api/.env`，取得以下變數：
-
-```
-PLANE_BASE_URL   # Plane 實例網址
-PLANE_API_KEY    # x-api-key 的值
-PLANE_WORKSPACE  # workspace slug
-```
-
-所有 curl 指令均以這三個變數組成 URL 和 Header：
+> 連線設定由 `plane-core` 統一管理，執行前先載入：
 
 ```bash
-# 以 shell 載入（執行 curl 前先 source）
-source ~/.cursor/skills/plane-api/.env
-
-# 或直接 export 供後續使用
-export $(cat ~/.cursor/skills/plane-api/.env | xargs)
+source ~/.cursor/skills/plane/plane-core/.env
 ```
 
-## 已知專案
-
-| 專案 | Project ID |
-|------|-----------|
-| LED 牆 | `08593f37-0c1f-4014-9437-26491832b083` |
-
-### LED 牆 States
-
-| 狀態 | ID |
-|------|---|
-| Backlog | `37eb9789-1031-4d30-bf53-f4f9df9dc2dd` |
-| Todo | `05d56210-9990-4220-8560-265b91a3145a` |
-| In Progress | `4dd5c4fd-3dcb-402c-81c4-7a0f426e752c` |
-| Done | `4c0ec082-b09f-480e-b853-4b9a55eeb287` |
-| Cancelled | `00900430-befb-4e32-af21-4e98fa29b6ab` |
+> 已知專案、States、欄位規範請參考 `plane-core/SKILL.md`。
 
 ## 常用 curl 指令
 
@@ -179,7 +153,7 @@ for item in results:
 #### 批次 Archive 多個 Issue
 
 ```bash
-source ~/.cursor/skills/plane-api/.env
+source ~/.cursor/skills/plane/plane-core/.env
 CSRF="<csrftoken 的值>"
 SESSION="<session-id 的值>"
 PROJECT_ID="{PROJECT_ID}"
@@ -200,7 +174,7 @@ done
 #### 批次 Unarchive 所有已封存的 Issue
 
 ```bash
-source ~/.cursor/skills/plane-api/.env
+source ~/.cursor/skills/plane/plane-core/.env
 CSRF="<csrftoken 的值>"
 SESSION="<session-id 的值>"
 PROJECT_ID="{PROJECT_ID}"
@@ -240,16 +214,6 @@ curl -s \
   "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/members/" \
   | jq '.[] | {id, display_name, email}'
 ```
-
-## 欄位規範
-
-| 欄位 | 可用值 |
-|------|--------|
-| `priority` | `urgent` / `high` / `medium` / `low` / `none` |
-| `description_html` | HTML 字串（`<p>`, `<ul>`, `<li>`, `<strong>` 等） |
-| `state` | State UUID |
-| `assignees` | `["user-uuid"]`（陣列） |
-| `parent` | Issue UUID 或 `null` |
 
 ## 已知限制
 
@@ -315,7 +279,7 @@ curl -s -X POST \
 #### 批次建立所有 States
 
 ```bash
-source ~/.cursor/skills/plane-api/.env
+source ~/.cursor/skills/plane/plane-core/.env
 PROJECT_ID="{PROJECT_ID}"
 
 create_state() {
@@ -337,7 +301,7 @@ create_state '{"name":"Cancelled",   "color":"#ABB8C3","group":"cancelled",  "de
 
 ## 建立 Work Items 的標準流程
 
-1. `source ~/.cursor/skills/plane-api/.env`
+1. `source ~/.cursor/skills/plane/plane-core/.env`
 2. 列出既有 issues，確認目前最大的 sequence_id
 3. 建立 parent issue，記錄回傳的 `id`
 4. 建立子 issues，填入 `"parent": "{parent_id}"`
