@@ -20,21 +20,31 @@ source ~/.cursor/skills/plane/plane-core/.env
 export $(cat ~/.cursor/skills/plane/plane-core/.env | xargs)
 ```
 
-## 已知專案
+## 已知專案快取
 
+讀取 `~/.cursor/skills/plane/plane-core/cache.md` 取得已快取的專案 ID 與 States。
+
+**寫入時機：**
+- 查詢到新專案且確認會重複使用 → 寫入「已知專案」
+- 查詢到新專案的 States → 寫入「已知 States」對應小節
+
+**移除時機：**
+- 使用者明確表示專案不再使用 → 移除對應條目
+
+**快取格式（新增專案時依此格式寫入）：**
+
+```markdown
+## 已知專案
 | 專案 | Project ID |
 |------|-----------|
-| LED 牆 | `08593f37-0c1f-4014-9437-26491832b083` |
+| {專案名稱} | `{project-uuid}` |
 
-### LED 牆 States
-
+## 已知 States
+### {專案名稱}
 | 狀態 | ID |
 |------|---|
-| Backlog | `37eb9789-1031-4d30-bf53-f4f9df9dc2dd` |
-| Todo | `05d56210-9990-4220-8560-265b91a3145a` |
-| In Progress | `4dd5c4fd-3dcb-402c-81c4-7a0f426e752c` |
-| Done | `4c0ec082-b09f-480e-b853-4b9a55eeb287` |
-| Cancelled | `00900430-befb-4e32-af21-4e98fa29b6ab` |
+| {State 名稱} | `{state-uuid}` |
+```
 
 ## 欄位規範
 
