@@ -20,6 +20,52 @@ source ~/.cursor/skills/plane/plane-core/.env
 export $(cat ~/.cursor/skills/plane/plane-core/.env | xargs)
 ```
 
+### 初始化（首次使用）
+
+若 `.env` 尚未建立，執行以下初始化流程：
+
+**步驟 1：確認 `.env` 是否存在**
+
+```bash
+ls ~/.cursor/skills/plane/plane-core/.env
+```
+
+**步驟 2：若不存在，從範本複製**
+
+```bash
+cp ~/.cursor/skills/plane/plane-core/env.example \
+   ~/.cursor/skills/plane/plane-core/.env
+```
+
+**步驟 3：引導使用者填入 API Key**
+
+複製後 `.env` 中 `PLANE_API_KEY` 尚未設定，告知使用者：
+
+> `.env` 已建立，請填入你的 Plane API Key：
+>
+> 1. 開啟 Plane → 右上角頭像 → **Profile** → **API Tokens**
+> 2. 建立或複製現有 Token
+> 3. 將 Token 填入：
+>    ```
+>    ~/.cursor/skills/plane/plane-core/.env
+>    ```
+>    將 `PLANE_API_KEY="你自己的 api key"` 的值替換為實際 Token
+>
+> 完成後告訴我，我會繼續執行。
+
+**步驟 4：確認連線**
+
+使用者回報填寫完成後，執行以下指令驗證：
+
+```bash
+source ~/.cursor/skills/plane/plane-core/.env && \
+curl -s -o /dev/null -w "%{http_code}" \
+  -H "x-api-key: $PLANE_API_KEY" \
+  "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/"
+```
+
+回傳 `200` 表示連線成功，可繼續操作。其他狀態碼代表 Token 無效或網址錯誤。
+
 ## 已知專案快取
 
 讀取 `~/.cursor/skills/plane/plane-core/cache.md` 取得已快取的專案 ID 與 States。
