@@ -1,6 +1,6 @@
 ---
 name: plane-api
-description: 使用 curl + x-api-key 操作 Plane 專案管理系統。當使用者要在 Plane 建立、查詢、更新 work items/issues，或提到「建立 Plane 任務」、「新增 work item」、「更新 Plane issue」時使用此 skill。不需要 MCP，直接透過 REST API 操作。
+description: 使用 curl + x-api-key 操作 Plane 專案管理系統。當使用者要在 Plane 建立、查詢、更新 work items/issues，或提到「建立 Plane 任務」、「新增 work item」、「更新 Plane issue」時使用此 skill。使用者以 `AIDB-3`、`SHO-12` 這種「專案代號-數字」形式指稱某個 work item 時（例如「來做 AIDB-3」、「把 SHO-12 改成 Done」）也用此 skill。不需要 MCP，直接透過 REST API 操作。
 ---
 
 # Plane API via curl
@@ -28,6 +28,55 @@ source ~/.plane/.env
 | 成員查詢（取得 user_id） | `references/member.md` |
 | Archive / Unarchive（非公開內部 API） | `references/archive.md` |
 
+## Work Item 識別碼：`AIDB-3` 這種形式
+
+使用者通常直接以 `AIDB-3`、`SHO-12` 指稱某個 work item。格式是
+`{專案 identifier}-{sequence_id}`：
+
+- **前綴就是專案**。`AIDB` 是專案的 `identifier` 欄位（專案短代號），不是 UUID。
+  看到前綴就等於已經指定了專案，**不要再問使用者「這是哪個專案」**。
+- 後面的數字是 `sequence_id`（專案內流水號），**不是** work item 的 UUID。
+  所有 API 路徑吃的都是 UUID，一定要先換算。
+
+> ⚠️ `sequence_id` 與標題開頭的編號常常不一致。例如 AIDB 專案的 `AIDB-3`
+> 標題是「2. 建立 Authentik OAuth provider」。**以 `sequence_id` 為準**，
+> 使用者說的號碼指的是識別碼，不是標題裡的序號。
+
+### 換算：`AIDB-3` → project UUID + work item UUID
+
+REST API 沒有「用識別碼直接查」的 endpoint，要兩段式換算：
+
+```bash
+source ~/.plane/.env
+
+IDENT=AIDB   # 前綴
+SEQ=3        # 數字
+
+# 1) 前綴 → project UUID
+PROJECT_ID=$(curl -s -H "X-API-Key: $PLANE_API_KEY" \
+  "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/" \
+  | jq -r --arg i "$IDENT" '.results[] | select(.identifier == $i) | .id')
+
+# 2) sequence_id → work item UUID
+WORK_ITEM_ID=$(curl -s -H "X-API-Key: $PLANE_API_KEY" \
+  "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/$PROJECT_ID/work-items/" \
+  | jq -r --argjson s "$SEQ" '.results[] | select(.sequence_id == $s) | .id')
+
+echo "$PROJECT_ID / $WORK_ITEM_ID"
+```
+
+拿到兩個 UUID 後，就能套用下方所有 `{PROJECT_ID}` / `{WORK_ITEM_ID}` 的指令。
+
+> 用 MCP 的話 `plane:retrieve_work_item_by_identifier("AIDB-3")` 一步到位，
+> 但只回傳 work item；要 project UUID 仍需讀回傳的 `project` 欄位。
+
+### ⚠️ 兩個實測踩過的坑
+
+- **`?sequence_id=3` 這個 query 參數無效**——會被靜默忽略、回傳整份清單。
+  只能用 jq 過濾。
+- **列表回傳是分頁 envelope，不是陣列**。要用 `.results[]`，`jq '.[]'` 取不到東西。
+  項目多時要看 `next_page_results` / `next_cursor` 翻頁，否則號碼大的會查不到。
+
 ## 常用快速指令
 
 > 假設已 source .env，變數 `$PLANE_BASE_URL`, `$PLANE_API_KEY`, `$PLANE_WORKSPACE` 已可用。
@@ -39,7 +88,7 @@ source ~/.plane/.env
 curl -s \
   -H "X-API-Key: $PLANE_API_KEY" \
   "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/{PROJECT_ID}/work-items/" \
-  | jq '.[] | {id, sequence_id, name, state, priority, parent}'
+  | jq '.results[] | {id, sequence_id, name, state, priority, parent}'
 ```
 
 ### 建立 Work Item
@@ -76,7 +125,7 @@ curl -s -X PATCH \
 curl -s \
   -H "X-API-Key: $PLANE_API_KEY" \
   "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/" \
-  | jq '.[] | {id, name, identifier}'
+  | jq '.results[] | {id, name, identifier}'
 ```
 
 ### Archive / Unarchive Issue（非公開內部 API）

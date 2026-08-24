@@ -69,11 +69,11 @@ curl -s -X POST \
 **GET** `/work-items/`
 
 ```bash
-# 列出全部
+# 列出全部（回傳是分頁 envelope，要用 .results[]，不是 .[]）
 curl -s \
   -H "X-API-Key: $PLANE_API_KEY" \
   "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/{PROJECT_ID}/work-items/" \
-  | jq '.[] | {id, name, state, priority}'
+  | jq '.results[] | {id, sequence_id, name, state, priority}'
 
 # 篩選特定 state + 分頁
 curl -s \
@@ -183,7 +183,7 @@ curl -s -X DELETE \
 | 欄位 | 類型 | 說明 |
 |------|------|------|
 | `id` | uuid | Work Item ID |
-| `sequence_id` | int | 人類可讀流水號（專案內唯一，如 `#421`） |
+| `sequence_id` | int | 人類可讀流水號（專案內唯一）。與專案 `identifier` 合成使用者口中的識別碼，如 `AIDB-3` = 專案 `AIDB` 的 `sequence_id` 3。換算方式見 `SKILL.md`「Work Item 識別碼」 |
 | `name` | string | 標題 |
 | `description_html` | string | HTML 描述 |
 | `description_stripped` | string | 純文字版（自動產生） |

@@ -103,7 +103,19 @@ curl -s -o /dev/null -w "%{http_code}" \
 | 狀態 | ID |
 |------|---|
 | {State 名稱} | `{state-uuid}` |
+
+### {專案名稱} Cycles
+| Cycle 名稱 | ID |
+|------------|---|
+| {Cycle 名稱} | `{cycle-uuid}` |
+
+### {專案名稱} Labels
+| Label | ID |
+|-------|-----|
+| {Label 名稱} | `{label-uuid}` |
 ```
+
+Cycles 與 Labels 小節為選用，查詢到才寫入；小節標題一律以專案名稱開頭，方便同一專案的資料集中。
 
 ## 欄位規範
 
@@ -199,3 +211,38 @@ MCP 建立的專案缺少預設 State 設定，導致後續建立 Work Item 時�
 
 - **Relations API 不支援**：self-hosted CE 版無 `/relations/` endpoint，改用 description 的「前置條件」欄位代替
 - **Archive API 為非公開內部 API**：需要瀏覽器 session cookie，詳見 `plane-api.md`
+
+## 建立 Cycle 的注意事項
+
+### 問題：Project ID 必須放在 URL 路徑
+
+在建立 Cycle 時，**`project` 欄位無法放在 request body 中**，必須透過 URL 路徑傳遞專案 ID。
+
+**錯誤做法（會收到 `"Project ID is required"` 錯誤）：**
+```bash
+# ❌ 將 project_id 放在 JSON body 中
+curl -X POST ... -d '{"name": "...", "project": "uuid-xxx"}'
+```
+
+**正確做法（project_id 只能從 URL 路徑傳遞）：**
+```bash
+# ✅ project_id 在 URL 路徑中
+curl -X POST "$BASE_URL/api/v1/workspaces/$WORKSPACE/projects/{PROJECT_ID}/cycles/" \
+  -d '{"name": "My Cycle", ...}'
+```
+
+**API 端點：**
+```
+POST /api/v1/workspaces/{workspace_slug}/projects/{project_id}/cycles/
+```
+
+**Request Body 欄位：**
+| 欄位 | 必填 | 說明 |
+|------|------|------|
+| `name` | ✅ | Cycle 名稱 |
+| `description` | ❌ | 描述文字 |
+| `start_date` | ❌ | 開始日期（ISO 8601） |
+| `end_date` | ❌ | 結束日期（ISO 8601） |
+| `owned_by` | ❌ | 負責人 UUID（user_id） |
+
+> ⚠️ 注意：`project` 欄位**不需要**也**不能**放在 request body 中，API 會自動從 URL 路徑取得。
