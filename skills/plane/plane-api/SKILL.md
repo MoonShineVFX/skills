@@ -12,7 +12,7 @@ description: 使用 curl + x-api-key 操作 Plane 專案管理系統。當使用
 > 連線設定由 `plane-core` 統一管理，執行前先載入：
 
 ```bash
-source ~/.cursor/skills/plane/plane-core/.env
+source ~/.plane/.env
 ```
 
 > 已知專案、States、欄位規範請參考 `plane-core/SKILL.md`。
@@ -98,7 +98,7 @@ curl -s \
 
 ## 建立 Work Items 的標準流程
 
-1. `source ~/.cursor/skills/plane/plane-core/.env`
+1. `source ~/.plane/.env`
 2. 列出既有 work items，確認目前最大的 `sequence_id`
 3. 建立 parent work item，記錄回傳的 `id`
 4. 建立子 work items，填入 `"parent": "{parent_id}"`

@@ -143,7 +143,7 @@ curl -s -X DELETE \
 ### 批次建立所有 States
 
 ```bash
-source ~/.cursor/skills/plane/plane-core/.env
+source ~/.plane/.env
 PROJECT_ID="{PROJECT_ID}"
 
 create_state() {

@@ -69,7 +69,7 @@ for item in results:
 ## 批次 Archive 多個 Issue
 
 ```bash
-source ~/.cursor/skills/plane/plane-core/.env
+source ~/.plane/.env
 CSRF="<csrftoken 的值>"
 SESSION="<session-id 的值>"
 PROJECT_ID="{PROJECT_ID}"
@@ -90,7 +90,7 @@ done
 ## 批次 Unarchive 所有已封存的 Issue
 
 ```bash
-source ~/.cursor/skills/plane/plane-core/.env
+source ~/.plane/.env
 CSRF="<csrftoken 的值>"
 SESSION="<session-id 的值>"
 PROJECT_ID="{PROJECT_ID}"

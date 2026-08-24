@@ -10,9 +10,15 @@
 
 ### 步驟 1: 安裝 Skill
 
-1. 下載 `okr-to-plane.zip`
-2. 在 Claude.ai 中：Settings > Capabilities > Skills > Upload skill
-3. 選擇 ZIP 檔案並啟用
+```bash
+# 安裝到目前專案（./.claude/skills/）
+npx skills add MoonShineVFX/skills --skill okr-to-plane --skill plane-core
+
+# 或安裝到全域（~/.claude/skills/），所有專案共用
+npx skills add MoonShineVFX/skills --skill okr-to-plane --skill plane-core -g
+```
+
+> `plane-core` 是共用知識庫（連線設定、命名慣例），一併安裝。
 
 ### 步驟 2: 確認 Plane MCP 已連接
 

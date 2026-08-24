@@ -7,17 +7,26 @@ description: 核心知識庫，供 plane-api 和 okr-to-plane 引用。不直接
 
 > 此文件為共享基礎，由 `plane-api` 和 `okr-to-plane` 引用。
 
-## 連線資訊
+## 設定檔位置
 
-`.env` 位於此 skill 目錄（`plane-core/`），使用前先載入：
+設定與快取統一放在 `~/.plane/`，**與 skill 安裝位置無關**（Claude Code / Cursor / Codex 等不同 agent、專案層或全域安裝皆適用）：
+
+| 檔案 | 用途 |
+|------|------|
+| `~/.plane/.env` | 連線設定（Base URL / API Key / Workspace） |
+| `~/.plane/cache.md` | 已知專案 ID 與 States 快取 |
+
+> ⚠️ 不要把 `.env` 放在 skill 目錄內：`skills update` 會覆蓋該目錄，也容易誤 commit 進版控。
+
+## 連線資訊
 
 ```bash
 # 載入環境變數（curl 前先執行）
-source ~/.cursor/skills/plane/plane-core/.env
+source ~/.plane/.env
 # 取得：PLANE_BASE_URL, PLANE_API_KEY, PLANE_WORKSPACE
 
 # 或直接 export 供後續使用
-export $(cat ~/.cursor/skills/plane/plane-core/.env | xargs)
+export $(grep -v '^#' ~/.plane/.env | xargs)
 ```
 
 ### 初始化（首次使用）
@@ -27,29 +36,33 @@ export $(cat ~/.cursor/skills/plane/plane-core/.env | xargs)
 **步驟 1：確認 `.env` 是否存在**
 
 ```bash
-ls ~/.cursor/skills/plane/plane-core/.env
+ls ~/.plane/.env
 ```
 
-**步驟 2：若不存在，從範本複製**
+**步驟 2：若不存在，建立範本**
 
 ```bash
-cp ~/.cursor/skills/plane/plane-core/env.example \
-   ~/.cursor/skills/plane/plane-core/.env
+mkdir -p ~/.plane
+cat > ~/.plane/.env <<'ENVEOF'
+PLANE_BASE_URL=https://your-plane.instance.com
+PLANE_API_KEY="你自己的 api key"
+PLANE_WORKSPACE=your-workspace
+ENVEOF
+chmod 600 ~/.plane/.env
 ```
 
-**步驟 3：引導使用者填入 API Key**
+**步驟 3：引導使用者填入連線資訊**
 
-複製後 `.env` 中 `PLANE_API_KEY` 尚未設定，告知使用者：
+範本中的值都是佔位字串，告知使用者：
 
-> `.env` 已建立，請填入你的 Plane API Key：
+> `~/.plane/.env` 已建立，請填入你的 Plane 連線資訊：
 >
 > 1. 開啟 Plane → 右上角頭像 → **Profile** → **API Tokens**
 > 2. 建立或複製現有 Token
-> 3. 將 Token 填入：
->    ```
->    ~/.cursor/skills/plane/plane-core/.env
->    ```
->    將 `PLANE_API_KEY="你自己的 api key"` 的值替換為實際 Token
+> 3. 編輯 `~/.plane/.env`，填入三個值：
+>    - `PLANE_BASE_URL`：你的 Plane 網址（例：`https://plane.example.com`）
+>    - `PLANE_API_KEY`：上一步取得的 Token
+>    - `PLANE_WORKSPACE`：workspace slug（網址中 `/` 後那段）
 >
 > 完成後告訴我，我會繼續執行。
 
@@ -58,7 +71,7 @@ cp ~/.cursor/skills/plane/plane-core/env.example \
 使用者回報填寫完成後，執行以下指令驗證：
 
 ```bash
-source ~/.cursor/skills/plane/plane-core/.env && \
+source ~/.plane/.env && \
 curl -s -o /dev/null -w "%{http_code}" \
   -H "x-api-key: $PLANE_API_KEY" \
   "$PLANE_BASE_URL/api/v1/workspaces/$PLANE_WORKSPACE/projects/"
@@ -68,7 +81,7 @@ curl -s -o /dev/null -w "%{http_code}" \
 
 ## 已知專案快取
 
-讀取 `~/.cursor/skills/plane/plane-core/cache.md` 取得已快取的專案 ID 與 States。
+讀取 `~/.plane/cache.md` 取得已快取的專案 ID 與 States。檔案不存在時視為空快取，第一次要寫入時再依下方格式建立。
 
 **寫入時機：**
 - 查詢到新專案且確認會重複使用 → 寫入「已知專案」
