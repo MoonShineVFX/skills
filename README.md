@@ -26,7 +26,7 @@ npx skills add MoonShineVFX/skills --skill plane-api -a claude-code -a cursor
 
 | Skill | 說明 | 相依 |
 |-------|------|------|
-| [`setup-aidb`](skills/aidb/setup-aidb/) | 把 Codex CLI 或 Claude Code CLI 連上 AI-DB MCP server：安裝、OAuth 登入、驗證、排錯 | — |
+| [`setup-aidb`](skills/aidb/setup-aidb/) | 把 Claude Code CLI、Codex CLI 或 Claude Desktop 連上 AI-DB MCP server：安裝、OAuth 登入、驗證、排錯 | — |
 | [`use-aidb`](skills/aidb/use-aidb/) | 連上之後怎麼用：哪些事走 MCP、哪些事用連線字串直連 PostgreSQL | — |
 
 ### Plane
@@ -69,7 +69,25 @@ claude mcp login ai-db
 claude mcp list
 ```
 
-Codex CLI 的版本鎖、排錯對照表與桌面版為何連不上，都在
+Claude Desktop 走另一條路：在 `claude_desktop_config.json` 的 `mcpServers` 區用
+`mcp-remote` 做本機橋接（自訂連接器連不上，那是雲端代連）。
+
+```jsonc
+// Settings → Developer → Edit Config
+"ai-db": {
+  "command": "npx",
+  "args": [
+    "-y", "mcp-remote",
+    "http://192.168.8.64:8000/mcp",
+    "6947",
+    "--allow-http",
+    "--static-oauth-client-info",
+    "{\"client_id\":\"8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo\"}"
+  ]
+}
+```
+
+Codex CLI 的版本鎖、Claude Desktop 各參數的用途、排錯對照表，都在
 [`setup-aidb`](skills/aidb/setup-aidb/) 裡。
 
 </details>

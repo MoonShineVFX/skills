@@ -2,25 +2,27 @@
 
 這份說明「為什麼」。要執行安裝的話回 `SKILL.md`。
 
-## 為什麼只有 CLI 連得上
+## 決定能不能用的，是請求從哪裡發出
 
-**AI-DB 沒有對外路徑**，只在公司內網的 `192.168.8.64`。這一條決定了哪些 client
-用得了：
+**AI-DB 沒有對外路徑**，只在公司內網的 `192.168.8.64`。所以問題不是「這個 client
+支不支援 MCP」，而是「連線是從誰的機器打出去的」：
 
-| client 怎麼連 MCP server | 能不能用 |
+| 請求從哪裡發出 | 能不能用 |
 |---|---|
-| 在**你自己的電腦**上直接連 | 可以——Codex CLI、Claude Code CLI 都是這一類 |
-| 交給**廠商的雲端**代連（ChatGPT 的 connector、Claude 的自訂連接器） | 不行，那些請求從公網發出，搆不到內網 |
+| **使用者自己的電腦**——Claude Code CLI、Codex CLI 直連 | 可以 |
+| **使用者自己的電腦**——Claude Desktop 透過本機的 `mcp-remote` 橋接 | 可以 |
+| **廠商的雲端**代連——ChatGPT 的 connector、Claude Desktop 的自訂連接器 | 不行，請求從公網發出，搆不到內網 |
 
-兩個桌面版都屬於後者。**這不是設定問題**——調參數、換 `client_id` 或改 Authentik
-都不會讓它們連上。要支援它們得先決定把 AI-DB 對外暴露，那是另一個題目。
+走雲端那一列**不是設定問題**——調參數、換 `client_id` 或改 Authentik 都不會讓它
+連上。要走那條路得先決定把 AI-DB 對外暴露，那是另一個題目。
 
 ## ChatGPT / Codex 桌面版
 
 ChatGPT 與 Codex 共用同一個桌面 app。**app 可以安裝並正常使用，只是連不上
 AI-DB。** 兩個各自獨立的原因，任一個都足以擋住：
 
-1. **沒有對外路徑**——見上一節。
+1. **沒有對外路徑**——見上一節。ChatGPT 桌面版沒有等價於 `mcpServers` 的本機
+   stdio 設定可用，所以 Claude Desktop 那條橋接路徑在這裡套不上。
 2. **版本鎖不住**——AI-DB 的 OAuth 相容性要求 Codex `0.146.1`，而桌面版會自動
    更新，無法固定在這個版本（AI-DB 實測：2026-08-14）。
 
@@ -30,21 +32,29 @@ macOS 上桌面版與 CLI 可能讀到同一份 `~/.codex/config.toml`。**設�
 不要為了讓桌面版登入而修改 AI-DB 的 URL、`client_id` 或 Authentik 設定。
 擋住它的是網路路徑與版本，不是這些值。
 
-## Claude Desktop
+## Claude Desktop 走的是本機橋接，不是自訂連接器
 
 Claude Desktop 加遠端 MCP server 的官方路徑是「自訂連接器」（Custom connector），
 而那條路徑要求 MCP server **從公網、由 Anthropic 的 IP 連得到**。AI-DB 只在內網，
-加了不會連上。
+用自訂連接器加進去不會連上。
 
-需要在 Claude 裡使用 AI-DB，請用 Claude Code CLI。
+可用的路徑是在設定檔的 `mcpServers` 區跑 `mcp-remote`：Claude Desktop 以 stdio
+啟動一個本機的 Node 程序，由它去打 `http://192.168.8.64:8000/mcp`。請求從使用者
+自己的機器發出，因此內網搆得到；OAuth 也在本機完成，callback 收在
+`http://127.0.0.1:6947/oauth/callback`。步驟見 `SKILL.md` 的 Claude Desktop 一節。
 
-> **關於本機橋接。** 技術上可以在自己的電腦跑一個 stdio 轉 HTTP 的橋接程式
->（例如 `mcp-remote`），讓請求從本機發出而不經過雲端。AI-DB 尚未驗證這條路徑，
-> 因此**不列為支援的安裝方式**。若之後驗證通過會補上。
+這條路徑的代價，是它把幾件事綁在使用者的機器上：
 
-`use-aidb` skill 與 MCP 是兩回事，Claude Desktop 這一側可以單獨安裝。但少了 MCP
-tool，那個 skill 只剩下「怎麼用連線字串直連 PostgreSQL」那一半——建立、刪除、
-輪替憑證都做不到。
+- **Node 必須裝在跑 Claude Desktop 的那個 OS 上。** Windows 版的 Claude Desktop
+  用 Windows 的 `npx`，WSL 裡裝的 Node 幫不上忙。
+- **callback port 是設定的一部分。** `6947` 對應到已登記在 Authentik 的 redirect
+  URI，改了就要請管理者同步登記，否則登入會被擋。
+- **token 存在 `~/.mcp-auth`，與 CLI 各自獨立。** CLI 登入過不代表桌面版登入過。
+- **那台機器離開內網就連不上。** 橋接只是把請求改從本機發出，並沒有給 AI-DB
+  對外路徑。
+
+`use-aidb` skill 與 MCP 是兩回事，可以單獨安裝。但少了 MCP tool，那個 skill 只剩
+「怎麼用連線字串直連 PostgreSQL」那一半——建立、刪除、輪替憑證都做不到。
 
 ## 為什麼 Codex CLI 鎖在 0.146.1
 

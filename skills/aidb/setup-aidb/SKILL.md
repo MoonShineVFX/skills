@@ -1,6 +1,6 @@
 ---
 name: setup-aidb
-description: 把 AI client 連上 MoonShine 內部的 AI-DB MCP server，涵蓋 Codex CLI 與 Claude Code CLI 的安裝、OAuth 登入與驗證。當使用者要安裝或設定 AI-DB、說連不上 AI-DB、登入沒反應、看不到 AI-DB 的 tool，或想用 AI-DB 但尚未安裝時使用。
+description: 把 AI client 連上 MoonShine 內部的 AI-DB MCP server，涵蓋 Claude Code CLI、Codex CLI 與 Claude Desktop（透過 mcp-remote 本機橋接）的安裝、OAuth 登入與驗證。當使用者要安裝或設定 AI-DB、說連不上 AI-DB、登入沒反應、看不到 AI-DB 的 tool，或想用 AI-DB 但尚未安裝時使用。
 ---
 
 # 安裝 AI-DB MCP server
@@ -26,26 +26,28 @@ client_id    8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo
 curl -s -o /dev/null -w '%{http_code}\n' http://192.168.8.64:8000/mcp
 #    預期 401（代表 server 活著且認證中介層在線）。連線失敗代表不在內網。
 
-# 2. 必須有 npm——兩條路徑都需要，npm 本身的安裝不在本 skill 範圍
+# 2. 必須有 npm／npx——三條路徑都需要，npm 本身的安裝不在本 skill 範圍
 npm --version
 ```
 
 3. 使用者要有公司的 Authentik 帳號，OAuth 登入時會用到。
 
-> **只有跑在使用者自己機器上的 CLI 連得上。** ChatGPT 與 Claude 的桌面版都是由
-> 廠商雲端代連，請求從公網發出，搆不到內網的 `192.168.8.64`。那不是設定問題——
-> 調參數、換 `client_id`、改 Authentik 都不會讓它們連上。理由見
-> `references/limitations.md`。
+> **請求必須從使用者自己的機器發出。** 走廠商雲端代連的路徑——ChatGPT 的
+> connector、Claude Desktop 的「自訂連接器」——請求從公網出去，搆不到內網的
+> `192.168.8.64`，那不是調參數或換 `client_id` 能解決的。Claude Desktop 要用
+> AI-DB，走本機的 `mcp-remote` 橋接（見下）。ChatGPT／Codex 桌面版目前沒有可用
+> 路徑，理由見 `references/limitations.md`。
 
 ## 選一條路徑
 
-先確認使用者要設定哪一個 CLI。若不確定，就是你現在正在其中運行的那一個。
+先確認使用者要設定哪一個 client。若不確定，就是你現在正在其中運行的那一個。
 
 | 使用者用的是 | 走哪一節 |
 |---|---|
 | Claude Code | [Claude Code CLI](#claude-code-cli) |
 | Codex CLI | [Codex CLI](#codex-cli) |
-| 兩個都用 | 兩節都做。設定各自獨立，互不影響 |
+| Claude Desktop | [Claude Desktop](#claude-desktop) |
+| 不只一個 | 各節都做。設定各自獨立，互不影響 |
 
 **設定寫在你執行指令的那個環境裡。** WSL 與 Windows 各有一份設定檔，兩邊不同步；
 在 WSL 裡設定完成後，Windows 上的同名 CLI 仍然看不到 server。
@@ -85,6 +87,12 @@ WSL、SSH 等開不了瀏覽器的環境改用 `claude mcp login ai-db --no-brow
 callback 網址**貼回終端機。
 
 也可以在 `claude` 裡輸入 `/mcp`，選 `ai-db` 後執行 Authenticate，結果相同。
+
+> **這一步必須由使用者在自己的終端機執行，不能請 Claude Code 這個 agent 代跑。**
+> Claude Code 執行 Bash 工具時沒有 TTY，`claude mcp login` 會直接失敗並回報
+> `stdin isn't a terminal, so authentication can't be completed here`——加
+> `--no-browser` 也一樣，因為問題是缺 TTY，不是缺瀏覽器。遇到使用者要求「幫我
+> 登入 ai-db」時，回覆請他在自己的終端機跑這條指令，不要嘗試用 Bash 工具執行。
 
 ### 3. 驗證
 
@@ -189,6 +197,76 @@ npx skills add MoonShineVFX/skills --skill use-aidb -g -a codex -y
 ### 7. 端到端確認
 
 請 Codex「列出我在 AI-DB 的資料庫」。**沒有資料庫時回傳空列表是正確結果。**
+
+## Claude Desktop
+
+Claude Desktop 的「自訂連接器」連不上 AI-DB——那條路是 Anthropic 的雲端代連，
+搆不到內網。改走 `mcp-remote`：它在**使用者自己的電腦**上跑一個 stdio ↔ HTTP 的
+橋接程式，請求就從本機發出。
+
+**Claude Desktop 執行的是它所在作業系統的 `npx`。** Windows 版跑 Windows 的 Node，
+不是 WSL 裡那份；Node 要裝在 Windows 這一側，而且那台機器要在公司內網。
+
+### 1. 編輯設定檔
+
+Settings → Developer → Edit Config 會打開 `claude_desktop_config.json`：
+
+- macOS `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows `%APPDATA%\Claude\claude_desktop_config.json`
+
+在 `mcpServers` 區加入 `ai-db`。**已經有其他 server 就併進去，不要整段覆蓋。**
+
+```json
+{
+  "mcpServers": {
+    "ai-db": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://192.168.8.64:8000/mcp",
+        "6947",
+        "--allow-http",
+        "--static-oauth-client-info",
+        "{\"client_id\":\"8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo\"}"
+      ]
+    }
+  }
+}
+```
+
+`args` 裡的每一項都不能省：
+
+| 參數 | 為什麼需要 |
+|---|---|
+| `6947` | 固定 OAuth callback 的本機 port，redirect URI 因此是 `http://127.0.0.1:6947/oauth/callback`。不給的話 `mcp-remote` 每次挑隨機 port，Authentik 會擋掉沒登記過的 URI。要換 port 得先請 AI-DB 管理者把新的 URI 加進 Authentik client |
+| `--allow-http` | AI-DB 是 `http://` 而非 https，`mcp-remote` 預設拒絕非 https 的 server |
+| `--static-oauth-client-info` | Authentik 不支援 Dynamic Client Registration，`client_id` 必須自己帶 |
+
+最後那一項的值是**字串形式的 JSON**，內層引號的 `\"` 是必要的跳脫，不是筆誤。
+
+### 2. 重開 Claude Desktop 並登入
+
+**完全結束 Claude Desktop 再開啟**——關掉視窗不算，macOS 用 Cmd+Q，Windows 從
+系統匣結束。啟動後 `mcp-remote` 會開瀏覽器帶你走 Authentik 登入，完成後回到 app。
+
+token 存在 `~/.mcp-auth`（Windows 是 `%USERPROFILE%\.mcp-auth`）。要重新登入就
+刪掉這個目錄再重開 app。
+
+### 3. 驗證
+
+Settings → Developer 裡 `ai-db` 應顯示為 running，聊天框的工具選單看得到 AI-DB
+的 tool。
+
+### 4. 安裝 use-aidb skill
+
+`npx skills add ...` 只裝給 CLI，Claude Desktop 讀不到。桌面版請在
+Settings → Capabilities → Skills 加入 `use-aidb`（把 `skills/aidb/use-aidb/`
+打包成 zip 上傳）。
+
+### 5. 端到端確認
+
+請 Claude「列出我在 AI-DB 的資料庫」。**沒有資料庫時回傳空列表是正確結果。**
 
 ## 出問題時
 
