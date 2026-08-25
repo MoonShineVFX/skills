@@ -105,19 +105,33 @@ AI-DB 仍負責 database lifecycle、access role、連線權與隔離。
 - 將密碼放入 secret manager 或受限環境變數；不要提交 Git。
 - 不要把完整 DSN 或密碼寫入 log、錯誤訊息、issue、PR 或聊天範例。
 - `get_connection_info` 不回傳密碼；這是預期行為，不代表 server 故障。
-- **本輪 server 未啟用 TLS，傳輸即為明文。** `sslmode=prefer` 不保證加密：它會嘗試協商，協商不到就走明文且不回報。這是團隊明確接受的剩餘風險，前提是系統僅開放於受信任的內網。不要在此存放敏感資料，也不要把這個 database 開放到內網以外。
+- **本輪 server 未啟用 TLS，傳輸即為明文。** `sslmode=disable` 誠實描述了這件事。這是團隊明確接受的剩餘風險，前提是系統僅開放於受信任的內網。不要在此存放敏感資料，也不要把這個 database 開放到內網以外。
 - **不要移除或修改 DSN 裡的 `sslmode` 參數。** 不依賴 driver 預設值；預設會隨
-  driver 與版本改變。AI-DB 明確交付 `sslmode=prefer`，目標 driver 必須以專案鎖定
+  driver 與版本改變。AI-DB 明確交付 `sslmode=disable`，目標 driver 必須以專案鎖定
   的版本驗證。此 repo 沒有 Go module，不能用未限定版本的 `lib/pq` 行為當保證。
+- **手上舊的連線字串若寫著 `sslmode=prefer`，改成 `disable`。** 2026-08-25 之前
+  交付的是 `prefer`，而它在 JS 生態連不上（見下方「Driver 注意事項」）。
+  只需要改這個參數，**密碼不變、不需要輪替**。
 
 ## Driver 注意事項
 
-psql、psycopg、asyncpg、Go `lib/pq` 與 `pgx` 可使用 AI-DB 交付的 PostgreSQL URI。
+psql、psycopg、asyncpg、Go `lib/pq` 與 `pgx`、node-postgres（`pg`）可使用
+AI-DB 交付的 PostgreSQL URI。
+
+**`sslmode` 只有 `disable` 在所有 driver 上都能用。** libpq 系的 `prefer` 是
+「試 TLS，server 不支援就降級為明文」，但 node-postgres 不降級——只要
+`sslmode` 不是 `disable` 它就進 SSL 握手，server 回報不支援時直接拋錯。
+AI-DB 的 server 未啟用 TLS，所以 `prefer` 對 JS 生態是一條永遠連不上的字串。
+
+Prisma 會把這個失敗**重新包裝成指向錯誤方向的訊息**——把來源 IP 塞進
+「database」欄位，看起來像資料庫名稱錯誤或權限問題。看到 `database
+192.168.x.x` 這種不合理的內容時，先確認 `sslmode` 是 `disable`，不要去查
+資料庫名稱。
 
 JDBC 不要直接在 PostgreSQL URI 前加 `jdbc:`，也不要把 `user:password@` 放進 JDBC authority；pgJDBC 可能把它當作 hostname 並將密碼寫入例外與 log。使用結構化欄位組合：
 
 ```java
-String url = "jdbc:postgresql://<host>:<port>/<database>?sslmode=prefer";
+String url = "jdbc:postgresql://<host>:<port>/<database>?sslmode=disable";
 Properties props = new Properties();
 props.setProperty("user", "<username>");
 props.setProperty("password", "<password>");
@@ -137,8 +151,10 @@ Connection connection = DriverManager.getConnection(url, props);
 | 明確回報密碼錯誤，且確認手上的 secret 已遺失、過期或不是目前版本 | 說明中斷影響並取得確認後，才呼叫 `rotate_database_credentials` |
 | role 不允許登入／`rolcanlogin=false` | 呼叫 `restore_database` 修復 role gate；若仍失敗，交由部署管理者檢查，**不要輪替** |
 | database 不存在或沒有 `CONNECT` | 先用 `get_connection_info` 核對 database，再呼叫 `restore_database`；**不要輪替** |
-| `no pg_hba.conf entry`／HBA 規則拒絕 | 部署設定問題，交由管理者檢查 `pg_hba.conf` 與來源網段；**不要輪替** |
-| connection refused／timeout／host 錯誤 | 核對 host、port、port mapping 與防火牆；**不要輪替** |
+| `no pg_hba.conf entry for host "<你的 IP>"` | 你的來源網段不在允許清單裡。部署設定問題，**把訊息裡那個 IP 一起回報給管理者**（他要用它決定加哪一段）；**不要輪替** |
+| 連線**逾時**（等很久、沒有任何回應） | 網路層，不是資料庫。你的網段到 server 的路徑被擋住了，回報管理者並附上你的 IP 與 `get_connection_info` 的 host／port；**不要輪替** |
+| connection refused（立刻被拒，不是逾時） | 核對 host、port 是否與 `get_connection_info` 一致；**不要輪替** |
+| 錯誤訊息裡的「database」是一個 IP 位址之類的怪東西 | 那是 SSL 握手失敗被 driver 重新包裝。確認 DSN 是 `sslmode=disable`（見「Driver 注意事項」）；**不要輪替** |
 | MCP 顯示 `ready` 但連不上 | 呼叫 `restore_database`。它會補齊所有缺少的連線條件，**不要帶 `name`** |
 | `permission denied for schema public` | 把 `public.` 拿掉。未限定即落在 `app`，`search_path` 已經設好 |
 | `\l` 列得出別人的 database，連不進去 | 那是正常的。名稱全域可見（PostgreSQL 擋不掉），但連線權逐一授予，你只連得進自己的那一個 |
@@ -155,6 +171,6 @@ Connection connection = DriverManager.getConnection(url, props);
 | 連不上或看到 authentication failure 就先輪替 | 只有確認是密碼錯誤、遺失或過期才輪替。LOGIN、CONNECT、database、host 與 HBA 問題不會被換密碼修好 |
 | 刪除是「之後才生效」 | 立即生效：新連線被拒，既有連線當場終止 |
 | 已刪除的 database 可以先輪替再還原 | 順序相反：先 `restore_database`，需要時再輪替 |
-| `sslmode=prefer` 代表連線有加密 | 不代表。server 未啟用 TLS，實際走明文 |
+| 把 `sslmode` 改成 `prefer` 或 `require` 就會加密 | 不會。server 未啟用 TLS，`require` 直接連不上，`prefer` 在 JS driver 上也連不上 |
 | 應該建 `public` schema 的表 | 用 `app`，且 `search_path` 已設好，不必特別指定 |
 | MCP 應該有 `execute_sql` 之類的 tool | 沒有，也不會有。資料操作一律走自己的 PostgreSQL 連線 |
