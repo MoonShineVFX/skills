@@ -1,6 +1,6 @@
 ---
 name: use-aidb
-description: 判斷 AI-DB 操作應呼叫 MCP 管理資料庫與憑證，或由使用者的應用程式透過 PostgreSQL 連線操作 schema、SQL 與資料。當使用者要建立、列出、刪除、還原資料庫，取得或輪替連線憑證，或要建表、migration、查詢與寫入資料時使用。
+description: 判斷 AI-DB 操作應呼叫 MCP 管理資料庫與憑證，或由使用者的應用程式透過 PostgreSQL 連線操作 schema、SQL 與資料。當使用者要建立、列出、刪除、還原資料庫，取得或輪替連線憑證，或要建表、migration、查詢與寫入資料，或問 AI-DB 用的 PostgreSQL 版本時使用。
 ---
 
 # 使用 AI-DB
@@ -76,6 +76,19 @@ description: 判斷 AI-DB 操作應呼叫 MCP 管理資料庫與憑證，或由�
 **資料庫只能從公司內網連線。** MCP 已對外開放、在哪裡都能用，但 connection string 指向內網位址；在家或外部網路拿到它也連不上。跑應用程式的那台機器必須在公司網路內。
 
 不要尋找或發明 `execute_sql`、`create_table`、`query_database` 等 MCP tool。
+
+### PostgreSQL 版本：17
+
+AI-DB 跑的是 **PostgreSQL 17**（官方映像 `postgres:17-alpine`）。大版本固定在 17；
+小版本跟著映像更新，沒有鎖定。需要確切版本時，用自己的連線查：
+
+```sql
+SHOW server_version;
+```
+
+- ORM、migration tool 要選支援 PostgreSQL 17 的版本；設定裡有資料庫版本選項的就填 17。
+- `pg_dump` 的版本必須 **≥ 伺服器的大版本**，用 16 以下的 `pg_dump` 備份會直接
+  拒絕執行。`pg_restore`、`psql` 用 17 版最不容易出問題。
 
 ### 工作區是 `app` schema，且 `search_path` 已經設好
 
