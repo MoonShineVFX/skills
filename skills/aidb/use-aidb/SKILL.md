@@ -71,7 +71,11 @@ description: 判斷 AI-DB 操作應呼叫 MCP 管理資料庫與憑證，或由�
 
 ## 應用程式資料流程
 
-取得 connection string 後，讓使用者的應用程式、ORM 或 migration framework 直接連 PostgreSQL。不要尋找或發明 `execute_sql`、`create_table`、`query_database` 等 MCP tool。
+取得 connection string 後，讓使用者的應用程式、ORM 或 migration framework 直接連 PostgreSQL。
+
+**資料庫只能從公司內網連線。** MCP 已對外開放、在哪裡都能用，但 connection string 指向內網位址；在家或外部網路拿到它也連不上。跑應用程式的那台機器必須在公司網路內。
+
+不要尋找或發明 `execute_sql`、`create_table`、`query_database` 等 MCP tool。
 
 ### 工作區是 `app` schema，且 `search_path` 已經設好
 
@@ -152,7 +156,7 @@ Connection connection = DriverManager.getConnection(url, props);
 | role 不允許登入／`rolcanlogin=false` | 呼叫 `restore_database` 修復 role gate；若仍失敗，交由部署管理者檢查，**不要輪替** |
 | database 不存在或沒有 `CONNECT` | 先用 `get_connection_info` 核對 database，再呼叫 `restore_database`；**不要輪替** |
 | `no pg_hba.conf entry for host "<你的 IP>"` | 你的來源網段不在允許清單裡。部署設定問題，**把訊息裡那個 IP 一起回報給管理者**（他要用它決定加哪一段）；**不要輪替** |
-| 連線**逾時**（等很久、沒有任何回應） | 網路層，不是資料庫。你的網段到 server 的路徑被擋住了，回報管理者並附上你的 IP 與 `get_connection_info` 的 host／port；**不要輪替** |
+| 連線**逾時**（等很久、沒有任何回應） | 網路層，不是資料庫。先確認你在公司內網——MCP 在外網能用，資料庫不行。已在內網仍逾時，就是你的網段到 server 的路徑被擋住了，回報管理者並附上你的 IP 與 `get_connection_info` 的 host／port；**不要輪替** |
 | connection refused（立刻被拒，不是逾時） | 核對 host、port 是否與 `get_connection_info` 一致；**不要輪替** |
 | 錯誤訊息裡的「database」是一個 IP 位址之類的怪東西 | 那是 SSL 握手失敗被 driver 重新包裝。確認 DSN 是 `sslmode=disable`（見「Driver 注意事項」）；**不要輪替** |
 | MCP 顯示 `ready` 但連不上 | 呼叫 `restore_database`。它會補齊所有缺少的連線條件，**不要帶 `name`** |

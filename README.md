@@ -42,7 +42,7 @@ npx skills add MoonShineVFX/skills --skill plane-api -a claude-code -a cursor
 ## 首次設定（AI-DB）
 
 AI-DB 是 MoonShine 內部的資料庫平台：用公司帳號建立自己的 PostgreSQL 資料庫，
-拿到專屬連線字串後由你的應用程式直連。**需要在公司內網。**
+拿到專屬連線字串後由你的應用程式直連。MCP 在哪裡都能用，**資料庫連線需要在公司內網。**
 
 先裝這兩個 skill，然後讓 agent 幫你完成安裝：
 
@@ -60,7 +60,7 @@ npx skills add MoonShineVFX/skills --skill setup-aidb --skill use-aidb -g -a cla
 # 1. 加入 server（--client-id 不能省略，且沒有 secret）
 claude mcp add --transport http --scope user \
   --client-id 8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo \
-  ai-db http://192.168.8.64:8000/mcp
+  ai-db https://aidb.moonshine-studio.net/mcp
 
 # 2. 用公司帳號登入（開不了瀏覽器的環境加 --no-browser）
 claude mcp login ai-db
@@ -70,7 +70,7 @@ claude mcp list
 ```
 
 Claude Desktop 走另一條路：在 `claude_desktop_config.json` 的 `mcpServers` 區用
-`mcp-remote` 做本機橋接（自訂連接器連不上，那是雲端代連）。
+`mcp-remote` 做本機橋接（自訂連接器登不進去，它的 OAuth callback 不在本機）。
 
 ```jsonc
 // Settings → Developer → Edit Config
@@ -78,9 +78,8 @@ Claude Desktop 走另一條路：在 `claude_desktop_config.json` 的 `mcpServer
   "command": "npx",
   "args": [
     "-y", "mcp-remote",
-    "http://192.168.8.64:8000/mcp",
+    "https://aidb.moonshine-studio.net/mcp",
     "6947",
-    "--allow-http",
     "--static-oauth-client-info",
     "{\"client_id\":\"8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo\"}"
   ]

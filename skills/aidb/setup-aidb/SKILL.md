@@ -13,7 +13,7 @@ AI-DB 是 MoonShine 內部的資料庫平台：使用者以公司帳號建立自
 連線資訊（兩個值都是公開識別值，不是密碼）：
 
 ```
-MCP server   http://192.168.8.64:8000/mcp
+MCP server   https://aidb.moonshine-studio.net/mcp
 client_id    8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo
 ```
 
@@ -22,9 +22,9 @@ client_id    8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo
 任一項不成立就停下來告訴使用者，不要繼續往下裝。
 
 ```bash
-# 1. 必須在公司內網——AI-DB 沒有對外路徑
-curl -s -o /dev/null -w '%{http_code}\n' http://192.168.8.64:8000/mcp
-#    預期 401（代表 server 活著且認證中介層在線）。連線失敗代表不在內網。
+# 1. server 必須連得到（MCP 已對外開放，不需在公司內網）
+curl -s -o /dev/null -w '%{http_code}\n' https://aidb.moonshine-studio.net/mcp
+#    預期 401（代表 server 活著且認證中介層在線）。連線失敗先查自己的網路。
 
 # 2. 必須有 npm／npx——三條路徑都需要，npm 本身的安裝不在本 skill 範圍
 npm --version
@@ -32,11 +32,14 @@ npm --version
 
 3. 使用者要有公司的 Authentik 帳號，OAuth 登入時會用到。
 
-> **請求必須從使用者自己的機器發出。** 走廠商雲端代連的路徑——ChatGPT 的
-> connector、Claude Desktop 的「自訂連接器」——請求從公網出去，搆不到內網的
-> `192.168.8.64`，那不是調參數或換 `client_id` 能解決的。Claude Desktop 要用
-> AI-DB，走本機的 `mcp-remote` 橋接（見下）。ChatGPT／Codex 桌面版目前沒有可用
-> 路徑，理由見 `references/limitations.md`。
+> **MCP 可以從任何地方使用，資料庫連線只能在公司內網。** `create_database`
+> 交付的連線字串指向內網位址，離開公司網路就連不上——那不是安裝問題。
+>
+> **OAuth 登入必須在使用者自己的機器上完成。** Authentik 只接受本機
+> （`localhost`／`127.0.0.1`）的 callback。走廠商雲端的路徑——ChatGPT 的
+> connector、Claude Desktop 的「自訂連接器」——callback 在廠商的網域，登入會被
+> 擋下。Claude Desktop 要用 AI-DB，走本機的 `mcp-remote` 橋接（見下）。
+> ChatGPT／Codex 桌面版目前沒有可用路徑，理由見 `references/limitations.md`。
 
 ## 選一條路徑
 
@@ -64,7 +67,7 @@ npm --version
 ```bash
 claude mcp add --transport http --scope user \
   --client-id 8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo \
-  ai-db http://192.168.8.64:8000/mcp
+  ai-db https://aidb.moonshine-studio.net/mcp
 ```
 
 - `--client-id` **不能省略**。Authentik 不支援 Dynamic Client Registration，
@@ -101,8 +104,13 @@ claude mcp list
 claude mcp get ai-db
 ```
 
-`ai-db` 必須顯示 `✔ Connected`，URL 是 `http://192.168.8.64:8000/mcp`。
+`ai-db` 必須顯示 `✔ Connected`，URL 是 `https://aidb.moonshine-studio.net/mcp`。
+
 顯示 `! Needs authentication` 代表第 2 步還沒完成。
+
+已經用舊的內網位址 `http://192.168.8.64:8000/mcp` 加過的話，**一定要換掉**：
+server 公告的 resource 已改成公網位址，與舊位址不符，登入會失敗。
+`claude mcp remove ai-db` 後依第 1 步重加，再重新登入。
 
 在 `claude` 裡輸入 `/mcp` 應能看到 `ai-db` 與它的 tool。
 
@@ -156,7 +164,7 @@ codex login
 
 ```bash
 codex mcp add ai-db \
-  --url http://192.168.8.64:8000/mcp \
+  --url https://aidb.moonshine-studio.net/mcp \
   --oauth-client-id 8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo
 ```
 
@@ -179,7 +187,7 @@ codex mcp login ai-db
 codex mcp list
 ```
 
-`ai-db` 必須已啟用、URL 是 `http://192.168.8.64:8000/mcp`，且 Auth 欄位是
+`ai-db` 必須已啟用、URL 是 `https://aidb.moonshine-studio.net/mcp`，且 Auth 欄位是
 **OAuth 而不是 `Not logged in`**。
 
 啟動 `codex` 後輸入 `/mcp`，應能看到 `ai-db` 與它的 tool。
@@ -200,12 +208,12 @@ npx skills add MoonShineVFX/skills --skill use-aidb -g -a codex -y
 
 ## Claude Desktop
 
-Claude Desktop 的「自訂連接器」連不上 AI-DB——那條路是 Anthropic 的雲端代連，
-搆不到內網。改走 `mcp-remote`：它在**使用者自己的電腦**上跑一個 stdio ↔ HTTP 的
-橋接程式，請求就從本機發出。
+Claude Desktop 的「自訂連接器」登不進 AI-DB——那條路的 OAuth callback 在
+Anthropic 的網域，Authentik 只接受本機 callback。改走 `mcp-remote`：它在
+**使用者自己的電腦**上跑一個 stdio ↔ HTTP 的橋接程式，登入也在本機完成。
 
 **Claude Desktop 執行的是它所在作業系統的 `npx`。** Windows 版跑 Windows 的 Node，
-不是 WSL 裡那份；Node 要裝在 Windows 這一側，而且那台機器要在公司內網。
+不是 WSL 裡那份；Node 要裝在 Windows 這一側。
 
 ### 1. 編輯設定檔
 
@@ -224,9 +232,8 @@ Settings → Developer → Edit Config 會打開 `claude_desktop_config.json`：
       "args": [
         "-y",
         "mcp-remote",
-        "http://192.168.8.64:8000/mcp",
+        "https://aidb.moonshine-studio.net/mcp",
         "6947",
-        "--allow-http",
         "--static-oauth-client-info",
         "{\"client_id\":\"8MGJHGH157nKGeP2o5pinEghwzS6FGUU9bLASnTo\"}"
       ]
@@ -235,12 +242,11 @@ Settings → Developer → Edit Config 會打開 `claude_desktop_config.json`：
 }
 ```
 
-`args` 裡的每一項都不能省：
+`args` 裡除了 port 的值可以換，其餘都不能省：
 
 | 參數 | 為什麼需要 |
 |---|---|
-| `6947` | 固定 OAuth callback 的本機 port，redirect URI 因此是 `http://127.0.0.1:6947/oauth/callback`。不給的話 `mcp-remote` 每次挑隨機 port，Authentik 會擋掉沒登記過的 URI。要換 port 得先請 AI-DB 管理者把新的 URI 加進 Authentik client |
-| `--allow-http` | AI-DB 是 `http://` 而非 https，`mcp-remote` 預設拒絕非 https 的 server |
+| `6947` | 固定 OAuth callback 的本機 port。Authentik 接受任何本機 port，固定它只是讓每次登入的行為一致、排錯時好對照；換成其他沒被占用的 port 也可以 |
 | `--static-oauth-client-info` | Authentik 不支援 Dynamic Client Registration，`client_id` 必須自己帶 |
 
 最後那一項的值是**字串形式的 JSON**，內層引號的 `\"` 是必要的跳脫，不是筆誤。
