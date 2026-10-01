@@ -1,6 +1,6 @@
 ---
 name: setup-aidb
-description: 把 AI client 連上 MoonShine 內部的 AI-DB MCP server，涵蓋 Claude Code CLI、Codex CLI 與 Claude Desktop（透過 mcp-remote 本機橋接）的安裝、OAuth 登入與驗證。當使用者要安裝或設定 AI-DB、說連不上 AI-DB、登入沒反應、看不到 AI-DB 的 tool，或想用 AI-DB 但尚未安裝時使用。
+description: 把 AI client 連上 MoonShine 內部的 AI-DB MCP server，涵蓋 Claude Code CLI、Codex CLI 與 Claude Desktop（透過 mcp-remote 本機橋接）的安裝、OAuth 登入與驗證。當使用者要安裝或設定 AI-DB、說連不上 AI-DB、登入沒反應、看不到 AI-DB 的 tool，或想用 AI-DB 但尚未安裝時使用。也用於 AI-DB 換網址後的重新設定——使用者說「AI-DB 換網址了」「幫我重新設定 AI-DB」，或設定裡還是 192.168.8.64 時。
 ---
 
 # 安裝 AI-DB MCP server
@@ -40,6 +40,41 @@ npm --version
 > connector、Claude Desktop 的「自訂連接器」——callback 在廠商的網域，登入會被
 > 擋下。Claude Desktop 要用 AI-DB，走本機的 `mcp-remote` 橋接（見下）。
 > ChatGPT／Codex 桌面版目前沒有可用路徑，理由見 `references/limitations.md`。
+
+## 從舊位址遷移
+
+2026-10-01 之前裝的設定指向內網的 `http://192.168.8.64:8000/mcp`。server 公告的
+resource 已改成 `https://aidb.moonshine-studio.net/mcp`，**舊設定登不進去，只能移除
+重加**——只改 token 或重新登入都沒用。
+
+先檢查使用者有沒有舊設定，三個 client 各查各的：
+
+```bash
+claude mcp get ai-db 2>/dev/null | grep -i url     # Claude Code
+codex mcp list 2>/dev/null | grep ai-db            # Codex CLI
+```
+
+Claude Desktop 看 `claude_desktop_config.json` 的 `ai-db` 那一段（路徑見
+[Claude Desktop](#claude-desktop) 第 1 步）。
+
+看到 `192.168.8.64` 的就照下表處理；都沒有舊設定的話，跳過本節，照一般安裝走。
+
+| client | 做法 |
+|---|---|
+| Claude Code | `claude mcp remove ai-db`，再從 [Claude Code CLI](#claude-code-cli) 第 1 步做到第 3 步 |
+| Codex CLI | `codex mcp remove ai-db`，先確認 `codex --version` 仍是 `0.146.1`，再從 [Codex CLI](#codex-cli) 第 3 步做到第 5 步。Codex 本身的 `codex login` 不用重做 |
+| Claude Desktop | 把 `args` 裡的 URL 換成新位址、**刪掉 `"--allow-http"` 那一項**；完全結束 app；**刪掉 `~/.mcp-auth`**（Windows 是 `%USERPROFILE%\.mcp-auth`），裡面存的是舊位址的 token；再從 [Claude Desktop](#claude-desktop) 第 2 步做起 |
+
+`claude mcp remove` 回報同名 server 存在於多個 scope 時，依提示逐一移除（例如
+`claude mcp remove ai-db -s local`），只留下重加時的 `--scope user` 那一份。
+
+**登入那一步一樣要使用者自己在終端機跑**，原因見 Claude Code 第 2 步。
+
+**不受影響、不用動的**：
+
+- `use-aidb` skill——更新 skill 即可，不需重新安裝
+- 已建立的資料庫、連線字串與密碼——資料庫的位址沒有變，仍只在公司內網連得到。
+  **不要因為換網址而輪替憑證**
 
 ## 選一條路徑
 
@@ -107,10 +142,7 @@ claude mcp get ai-db
 `ai-db` 必須顯示 `✔ Connected`，URL 是 `https://aidb.moonshine-studio.net/mcp`。
 
 顯示 `! Needs authentication` 代表第 2 步還沒完成。
-
-已經用舊的內網位址 `http://192.168.8.64:8000/mcp` 加過的話，**一定要換掉**：
-server 公告的 resource 已改成公網位址，與舊位址不符，登入會失敗。
-`claude mcp remove ai-db` 後依第 1 步重加，再重新登入。
+URL 還是 `192.168.8.64` 的話，見[從舊位址遷移](#從舊位址遷移)。
 
 在 `claude` 裡輸入 `/mcp` 應能看到 `ai-db` 與它的 tool。
 

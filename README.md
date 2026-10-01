@@ -51,6 +51,14 @@ npx skills add MoonShineVFX/skills --skill setup-aidb --skill use-aidb -g -a cla
 ```
 
 裝好之後跟 Claude Code 說「幫我把 AI-DB 裝起來」，它會照 `setup-aidb` 逐步執行並驗證。
+
+**2026-10-01 之前裝過的人**：AI-DB 換了網址，舊設定登不進去。先更新 skill，再請 agent 重新設定：
+
+```bash
+npx skills update setup-aidb use-aidb
+```
+
+然後跟 agent 說「AI-DB 換網址了，幫我重新設定」。已建立的資料庫與密碼都不受影響。
 用 Codex 的話把 `-a claude-code` 換成 `-a codex`。
 
 <details>
